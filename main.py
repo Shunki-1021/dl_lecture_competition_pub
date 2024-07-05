@@ -357,7 +357,6 @@ def eval(model, dataloader, optimizer, criterion, device):
 
     return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
 
-
 def main():
     # deviceの設定
     set_seed(42)
@@ -366,6 +365,8 @@ def main():
     # dataloader / model
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
+        transforms.RandomRotation(degrees=(-90, 90)),
+        transforms.RandomCrop(32, padding=(2, 2, 2, 2), padding_mode='constant'),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
