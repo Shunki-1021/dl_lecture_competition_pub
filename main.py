@@ -324,7 +324,7 @@ class VQAModel(nn.Module):
 
 
 # 4. 学習の実装
-def train(model, dataloader, optimizer, criterion, device):
+def train(model, dataloader, criterion, optimizer, scheduler, device):
     model.train()
 
     total_loss = 0
@@ -346,11 +346,11 @@ def train(model, dataloader, optimizer, criterion, device):
         total_loss += loss.item()
         total_acc += VQA_criterion(pred.argmax(1), answers)  # VQA accuracy
         simple_acc += (pred.argmax(1) == mode_answer).float().mean().item()  # simple accuracy
-
+    scheduler.step(total_loss)
     return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
 
 
-def eval(model, dataloader, optimizer, criterion, device):
+def eval(model, dataloader, criterion, optimizer, device):
     model.eval()
 
     total_loss = 0
@@ -402,10 +402,11 @@ def main():
     num_epoch = 10
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=5)
 
     # train model
     for epoch in range(num_epoch):
-        train_loss, train_acc, train_simple_acc, train_time = train(model, train_loader, optimizer, criterion, device)
+        train_loss, train_acc, train_simple_acc, train_time = train(model, train_loader, criterion, optimizer, scheduler, device)
         print(f"【{epoch + 1}/{num_epoch}】\n"
               f"train time: {train_time:.2f} [s]\n"
               f"train loss: {train_loss:.4f}\n"
