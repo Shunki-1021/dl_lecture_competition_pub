@@ -44,7 +44,10 @@ def process_text(text):
     # 短縮形のカンマの追加
     contractions = {
         "dont": "don't", "isnt": "isn't", "arent": "aren't", "wont": "won't",
-        "cant": "can't", "wouldnt": "wouldn't", "couldnt": "couldn't"
+        "cant": "can't", "wouldnt": "wouldn't", "couldnt": "couldn't",
+        "im": "i'm", "ive": "i've", "id": "i'd", "ill": "i'll",
+        "youre": "you're", "youve": "you've", "youd": "you'd", "youll": "you'll",
+        "hes": "he's", "shes": "she's", "its": "it's", "weve": "we've", "theyve": "they've"
     }
     for contraction, correct in contractions.items():
         text = text.replace(contraction, correct)
@@ -130,22 +133,23 @@ class VQADataset(torch.utils.data.Dataset):
         """
         image = Image.open(f"{self.image_dir}/{self.df['image'][idx]}")
         image = self.transform(image)
-        question = np.zeros(len(self.idx2question) + 1)  # 未知語用の要素を追加
-        question_words = self.df["question"][idx].split(" ")
+        question = process_text(self.df["question"][idx])
+        question_words = question.split(" ")
+        question_vector = np.zeros(len(self.idx2question) + 1)  # 未知語用の要素を追加
         for word in question_words:
             try:
-                question[self.question2idx[word]] = 1  # one-hot表現に変換
+                question_vector[self.question2idx[word]] = 1  # one-hot表現に変換
             except KeyError:
-                question[-1] = 1  # 未知語
+                question_vector[-1] = 1  # 未知語
 
         if self.answer:
             answers = [self.answer2idx[process_text(answer["answer"])] for answer in self.df["answers"][idx]]
             mode_answer_idx = mode(answers)  # 最頻値を取得（正解ラベル）
 
-            return image, torch.Tensor(question), torch.Tensor(answers), int(mode_answer_idx)
+            return image, torch.Tensor(question_vector), torch.Tensor(answers), int(mode_answer_idx)
 
         else:
-            return image, torch.Tensor(question)
+            return image, torch.Tensor(question_vector)
 
     def __len__(self):
         return len(self.df)
@@ -290,7 +294,7 @@ def ResNet50():
 class VQAModel(nn.Module):
     def __init__(self, vocab_size: int, n_answer: int):
         super().__init__()
-        self.resnet = ResNet18()
+        self.resnet = ResNet50()
         self.text_encoder = nn.Linear(vocab_size, 512)
 
         self.fc = nn.Sequential(
@@ -365,17 +369,22 @@ def main():
     # dataloader / model
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
-        transforms.RandomRotation(degrees=(-90, 90)),
-        transforms.RandomCrop(32, padding=(2, 2, 2, 2), padding_mode='constant'),
+        transforms.RandomRotation(degrees=(-45, 45)),
+        transforms.RandomCrop(16, padding=(4, 4, 4, 4), padding_mode='constant'),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.RandomErasing(p=0.75, scale=(0.05, 0.15), ratio=(0.3, 1.5)),
+        transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))
     ])
     train_dataset = VQADataset(df_path="/content/drive/MyDrive/ColabNotebooks/DLBasics2023_colab/visual_question_answering/dl_lecture_competition_pub/data/train.json", image_dir="/content/train", transform=transform)
     test_dataset = VQADataset(df_path="/content/drive/MyDrive/ColabNotebooks/DLBasics2023_colab/visual_question_answering/dl_lecture_competition_pub/data/valid.json", image_dir="/content/valid", transform=transform, answer=False)
     test_dataset.update_dict(train_dataset)
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=512, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+
 
     model = VQAModel(vocab_size=len(train_dataset.question2idx)+1, n_answer=len(train_dataset.answer2idx)).to(device)
 
