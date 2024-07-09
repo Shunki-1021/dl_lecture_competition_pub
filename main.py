@@ -11,6 +11,8 @@ import torch.nn as nn
 import torchvision
 from torchvision import transforms
 
+import nltk
+from nltk.corpus import stopwords
 
 def set_seed(seed):
     random.seed(seed)
@@ -21,7 +23,7 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
+nltk.download('stopwords')
 def process_text(text):
     # lowercase
     text = text.lower()
@@ -60,6 +62,14 @@ def process_text(text):
 
     # 連続するスペースを1つに変換
     text = re.sub(r'\s+', ' ', text).strip()
+
+    # ストップワードの削除
+    def remove_stopwords(text):
+      stop_words = set(stopwords.words('english'))
+      tokens = text.split()
+      filtered_tokens = [word for word in tokens if word.lower() not in stop_words]
+      return ' '.join(filtered_tokens)
+    text = remove_stopwords(text)
 
     return text
 
