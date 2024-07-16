@@ -144,22 +144,22 @@ class VQADataset(torch.utils.data.Dataset):
         image = Image.open(f"{self.image_dir}/{self.df['image'][idx]}")
         image = self.transform(image)
         question = process_text(self.df["question"][idx])
-        question_words = question.split(" ")
-        question_vector = np.zeros(len(self.idx2question) + 1)  # 未知語用の要素を追加
-        for word in question_words:
+        question = question.split(" ")
+        question = np.zeros(len(self.idx2question) + 1)  # 未知語用の要素を追加
+        for word in question:
             try:
-                question_vector[self.question2idx[word]] = 1  # one-hot表現に変換
+                question[self.question2idx[word]] = 1  # one-hot表現に変換
             except KeyError:
-                question_vector[-1] = 1  # 未知語
+                question[-1] = 1  # 未知語
 
         if self.answer:
             answers = [self.answer2idx[process_text(answer["answer"])] for answer in self.df["answers"][idx]]
             mode_answer_idx = mode(answers)  # 最頻値を取得（正解ラベル）
 
-            return image, torch.Tensor(question_vector), torch.Tensor(answers), int(mode_answer_idx)
+            return image, torch.Tensor(question), torch.Tensor(answers), int(mode_answer_idx)
 
         else:
-            return image, torch.Tensor(question_vector)
+            return image, torch.Tensor(question)
 
     def __len__(self):
         return len(self.df)
@@ -380,7 +380,7 @@ def main():
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.RandomRotation(degrees=(-45, 45)),
-        transforms.RandomCrop(16, padding=(4, 4, 4, 4), padding_mode='constant'),
+        transforms.RandomCrop(64, padding=(4, 4, 4, 4), padding_mode='constant'),
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
